@@ -23,22 +23,22 @@ export default async function handler(req, res) {
 - 不要评价，不要建议，只输出五个变体`;
 
   try {
-    const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.SILICONFLOW_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'deepseek-ai/DeepSeek-R1',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userInput }
-        ],
-        temperature: 0.8,
-        max_tokens: 500
-      })
-    });
+   const response = await fetch('https://models.inference.ai.azure.com/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${process.env.GITHUB_TOKEN}`
+  },
+  body: JSON.stringify({
+    model: 'gpt-4o',
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userInput }
+    ],
+    temperature: 0.8,
+    max_tokens: 500
+  })
+});
 
     const data = await response.json();
     const raw = data.choices[0].message.content;
