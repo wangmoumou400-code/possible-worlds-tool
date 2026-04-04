@@ -33,6 +33,8 @@
         .footer { padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #e0e0e0; }
         .btn-secondary { background: #6c757d; margin-left: 12px; }
         .btn-secondary:hover { background: #5c636a; }
+        .btn-export { background: #28a745; margin-left: 12px; }
+        .btn-export:hover { background: #218838; }
         .selected-count { font-weight: bold; color: #198754; }
     </style>
 </head>
@@ -56,9 +58,32 @@
     const userInput = document.getElementById('userInput');
     const resultArea = document.getElementById('resultArea');
 
-    let currentVariations = [];  // 存储当前变体数据
+    let currentVariations = [];      // 存储当前9条变体
+    let selectedVariationsArray = []; // 存储最终选择的变体
 
-    // 渲染变体列表（带复选框选择）
+    // 生成并下载JSON记录文件
+    function downloadExperimentData() {
+        const record = {
+            timestamp: new Date().toISOString(),
+            userInput: userInput.value.trim(),
+            allVariations: currentVariations,
+            selectedVariations: selectedVariationsArray,
+            selectionCount: selectedVariationsArray.length
+        };
+        const jsonStr = JSON.stringify(record, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `experiment_data_${Date.now()}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        alert('实验数据已保存为JSON文件，请妥善保管！');
+    }
+
+    // 渲染变体列表（带点击选择）
     function renderVariations(variations) {
         let html = '<div style="margin-top:24px;"><h3>🌟 你可能感兴趣的可能世界</h3>';
         html += '<div class="selection-info">请选择 <span class="selected-count" id="selectedCount">0</span> / 3-5 条最有启发性的变体（点击卡片切换选择）</div>';
@@ -75,17 +100,16 @@
         html += '<div style="margin-top:20px; display:flex; gap:12px;">';
         html += '<button id="confirmBtn" class="btn-primary">✓ 确认选择并开始写作</button>';
         html += '<button id="resetSelectionBtn" class="btn-secondary">⟳ 清空选择</button>';
+        html += '<button id="exportDataBtn" class="btn-export">📥 导出实验数据</button>';
         html += '</div></div>';
         resultArea.innerHTML = html;
 
-        // 绑定点击事件（卡片切换选中状态）
         const cards = document.querySelectorAll('.variation-card');
         const selectedSet = new Set();  // 存储选中索引
         const selectedCountSpan = document.getElementById('selectedCount');
 
         function updateSelectedCount() {
             selectedCountSpan.textContent = selectedSet.size;
-            // 可选：高亮超过5条或少于3条的提示（但不强制阻止确认）
             if (selectedSet.size < 3) {
                 selectedCountSpan.style.color = '#dc3545';
             } else if (selectedSet.size > 5) {
@@ -109,40 +133,49 @@
             });
         });
 
-        // 确认按钮：记录选择并提示（实际写作中可存储到localStorage或发送到后端）
+        // 确认选择
         document.getElementById('confirmBtn').addEventListener('click', () => {
             const selected = Array.from(selectedSet).map(i => variations[i]);
             if (selectedSet.size < 3) {
-                alert(`您只选择了 ${selectedSet.size} 条变体。建议选择3-5条以获得更丰富的灵感。是否继续？`, 
-                    { confirm: () => proceedWithSelection(selected) });
+                if (confirm(`您只选择了 ${selectedSet.size} 条变体。建议选择3-5条以获得更丰富的灵感。是否继续？`)) {
+                    finalizeSelection(selected);
+                }
             } else if (selectedSet.size > 5) {
-                alert(`您选择了 ${selectedSet.size} 条变体。建议不超过5条以免分散注意力。是否继续？`,
-                    { confirm: () => proceedWithSelection(selected) });
+                if (confirm(`您选择了 ${selectedSet.size} 条变体。建议不超过5条以免分散注意力。是否继续？`)) {
+                    finalizeSelection(selected);
+                }
             } else {
-                proceedWithSelection(selected);
+                finalizeSelection(selected);
             }
         });
 
-        // 清空选择按钮
+        // 清空选择
         document.getElementById('resetSelectionBtn').addEventListener('click', () => {
             selectedSet.clear();
             cards.forEach(card => card.classList.remove('selected'));
             updateSelectedCount();
         });
 
-        function proceedWithSelection(selected) {
-            // 存储选择结果（可用于后续分析或日志）
-            console.log('用户选择的变体:', selected);
-            // 显示确认信息，并允许开始写作
+        // 导出数据（无需先确认）
+        document.getElementById('exportDataBtn').addEventListener('click', () => {
+            if (currentVariations.length === 0) {
+                alert('尚未生成任何变体，无法导出。');
+                return;
+            }
+            downloadExperimentData();
+        });
+
+        function finalizeSelection(selected) {
+            selectedVariationsArray = selected;
+            // 显示确认信息，并提供开始写作按钮
             let summaryHtml = '<div class="selection-info" style="margin-top:16px;">✅ 已选择 ' + selected.length + ' 条变体。你可以开始写作了！</div>';
             summaryHtml += '<button id="startWritingBtn" class="btn-primary">✍️ 开始写作</button>';
             resultArea.insertAdjacentHTML('beforeend', summaryHtml);
             document.getElementById('startWritingBtn').addEventListener('click', () => {
                 alert('请返回写作界面，开始正式写作。');
-                // 可选：自动滚动到顶部，清空结果显示等
-                // 这里不做强制跳转，由用户自行继续
+                // 可选：此处可自动清除选择区域，但保留界面让用户继续操作
             });
-            // 可选：将选择结果保存在全局供后续实验记录
+            // 全局保存以备导出
             window.selectedVariations = selected;
         }
     }
