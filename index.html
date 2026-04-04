@@ -23,11 +23,17 @@
         textarea:focus { outline: none; border-color: #667eea; }
         button { padding: 12px 24px; border: none; border-radius: 30px; font-weight: 600; cursor: pointer; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-top: 16px; }
         .loading { text-align: center; padding: 40px; color: #667eea; }
-        .variation-card { background: #f8f9fa; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #667eea; }
+        .variation-card { background: #f8f9fa; border-radius: 12px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #667eea; cursor: pointer; transition: background 0.2s; }
+        .variation-card:hover { background: #e9ecef; }
+        .variation-card.selected { background: #d1e7dd; border-left-color: #198754; }
         .variation-type { font-size: 12px; color: #667eea; font-weight: 600; }
         .variation-text { font-size: 15px; margin-top: 8px; font-style: italic; }
+        .selection-info { margin: 16px 0; padding: 12px; background: #e8f4f8; border-radius: 12px; font-size: 14px; text-align: center; }
         .info-note { margin-top: 24px; padding: 16px; background: #e8f4f8; border-radius: 12px; font-size: 13px; text-align: center; }
         .footer { padding: 20px; text-align: center; font-size: 12px; color: #999; border-top: 1px solid #e0e0e0; }
+        .btn-secondary { background: #6c757d; margin-left: 12px; }
+        .btn-secondary:hover { background: #5c636a; }
+        .selected-count { font-weight: bold; color: #198754; }
     </style>
 </head>
 <body>
@@ -37,17 +43,109 @@
         <p>基于可能世界理论的AI创意写作助手</p>
     </div>
     <div class="content">
-        <textarea id="userInput" rows="5" placeholder="例如：&#10;他推开那扇门，发现房间里的一切都和十年前一模一样。墙上挂着的照片还在，桌上的信也没人动过。他深吸一口气，走了进去。"></textarea>
+        <textarea id="userInput" rows="5" placeholder="请输入你的故事片段或大纲..."></textarea>
         <button id="generateBtn">✨ 探索可能世界</button>
         <div id="resultArea"></div>
-        <div class="info-note">💡 AI会从「角色替换·时空置换·因果反转·模态转换·视角切换」五个角度，各生成一条“如果……”的反事实变体。</div>
+        <div class="info-note">💡 基于Ryan (1991) 九种可及性关系生成反事实变体。请选择3-5条最有启发性的方向融入故事。</div>
     </div>
     <div class="footer">🎓 研究用途 | 基于可能世界理论设计</div>
 </div>
+
 <script>
     const generateBtn = document.getElementById('generateBtn');
     const userInput = document.getElementById('userInput');
     const resultArea = document.getElementById('resultArea');
+
+    let currentVariations = [];  // 存储当前变体数据
+
+    // 渲染变体列表（带复选框选择）
+    function renderVariations(variations) {
+        let html = '<div style="margin-top:24px;"><h3>🌟 你可能感兴趣的可能世界</h3>';
+        html += '<div class="selection-info">请选择 <span class="selected-count" id="selectedCount">0</span> / 3-5 条最有启发性的变体（点击卡片切换选择）</div>';
+        html += '<div id="variationsList">';
+        variations.forEach((v, idx) => {
+            html += `
+                <div class="variation-card" data-idx="${idx}">
+                    <div class="variation-type">${v.type}</div>
+                    <div class="variation-text">“${v.text}”</div>
+                </div>
+            `;
+        });
+        html += '</div>';
+        html += '<div style="margin-top:20px; display:flex; gap:12px;">';
+        html += '<button id="confirmBtn" class="btn-primary">✓ 确认选择并开始写作</button>';
+        html += '<button id="resetSelectionBtn" class="btn-secondary">⟳ 清空选择</button>';
+        html += '</div></div>';
+        resultArea.innerHTML = html;
+
+        // 绑定点击事件（卡片切换选中状态）
+        const cards = document.querySelectorAll('.variation-card');
+        const selectedSet = new Set();  // 存储选中索引
+        const selectedCountSpan = document.getElementById('selectedCount');
+
+        function updateSelectedCount() {
+            selectedCountSpan.textContent = selectedSet.size;
+            // 可选：高亮超过5条或少于3条的提示（但不强制阻止确认）
+            if (selectedSet.size < 3) {
+                selectedCountSpan.style.color = '#dc3545';
+            } else if (selectedSet.size > 5) {
+                selectedCountSpan.style.color = '#ffc107';
+            } else {
+                selectedCountSpan.style.color = '#198754';
+            }
+        }
+
+        cards.forEach(card => {
+            card.addEventListener('click', () => {
+                const idx = parseInt(card.dataset.idx);
+                if (selectedSet.has(idx)) {
+                    selectedSet.delete(idx);
+                    card.classList.remove('selected');
+                } else {
+                    selectedSet.add(idx);
+                    card.classList.add('selected');
+                }
+                updateSelectedCount();
+            });
+        });
+
+        // 确认按钮：记录选择并提示（实际写作中可存储到localStorage或发送到后端）
+        document.getElementById('confirmBtn').addEventListener('click', () => {
+            const selected = Array.from(selectedSet).map(i => variations[i]);
+            if (selectedSet.size < 3) {
+                alert(`您只选择了 ${selectedSet.size} 条变体。建议选择3-5条以获得更丰富的灵感。是否继续？`, 
+                    { confirm: () => proceedWithSelection(selected) });
+            } else if (selectedSet.size > 5) {
+                alert(`您选择了 ${selectedSet.size} 条变体。建议不超过5条以免分散注意力。是否继续？`,
+                    { confirm: () => proceedWithSelection(selected) });
+            } else {
+                proceedWithSelection(selected);
+            }
+        });
+
+        // 清空选择按钮
+        document.getElementById('resetSelectionBtn').addEventListener('click', () => {
+            selectedSet.clear();
+            cards.forEach(card => card.classList.remove('selected'));
+            updateSelectedCount();
+        });
+
+        function proceedWithSelection(selected) {
+            // 存储选择结果（可用于后续分析或日志）
+            console.log('用户选择的变体:', selected);
+            // 显示确认信息，并允许开始写作
+            let summaryHtml = '<div class="selection-info" style="margin-top:16px;">✅ 已选择 ' + selected.length + ' 条变体。你可以开始写作了！</div>';
+            summaryHtml += '<button id="startWritingBtn" class="btn-primary">✍️ 开始写作</button>';
+            resultArea.insertAdjacentHTML('beforeend', summaryHtml);
+            document.getElementById('startWritingBtn').addEventListener('click', () => {
+                alert('请返回写作界面，开始正式写作。');
+                // 可选：自动滚动到顶部，清空结果显示等
+                // 这里不做强制跳转，由用户自行继续
+            });
+            // 可选：将选择结果保存在全局供后续实验记录
+            window.selectedVariations = selected;
+        }
+    }
 
     generateBtn.addEventListener('click', async () => {
         const text = userInput.value.trim();
@@ -64,12 +162,8 @@
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
-            let html = '<div style="margin-top:24px;"><h3>🌟 你可能感兴趣的可能世界</h3>';
-            data.variations.forEach(v => {
-                html += `<div class="variation-card"><div class="variation-type">${v.type}</div><div class="variation-text">“${v.text}”</div></div>`;
-            });
-            html += '</div>';
-            resultArea.innerHTML = html;
+            currentVariations = data.variations;
+            renderVariations(currentVariations);
         } catch (err) {
             resultArea.innerHTML = '<div style="color:red;">生成失败，请稍后重试</div>';
         }
